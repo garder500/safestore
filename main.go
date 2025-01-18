@@ -23,14 +23,18 @@ func main() {
 			return
 		}
 		defer c.Close()
-
+		userID, err := utils.GenerateRandomString()
+		if err != nil {
+			log.Println(err)
+			return
+		}
 		for {
 			mt, message, err := c.ReadMessage()
 			if err != nil {
 				log.Println("read:", err)
 				break
 			}
-			log.Printf("recv: %s", message)
+			log.Printf("recv: %s by %s", message, userID)
 			err = c.WriteMessage(mt, message)
 			if err != nil {
 				log.Println("write:", err)
