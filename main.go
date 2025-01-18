@@ -1,28 +1,44 @@
 package main
 
-import "github.com/garder500/safestore/utils"
+import (
+	"log"
+	"net/http"
+
+	"github.com/garder500/safestore/utils"
+	"github.com/gorilla/websocket"
+)
 
 func main() {
-	manager, err := utils.NewManager()
+	_, err := utils.NewManager()
 	if err != nil {
 		panic(err)
 	}
 
-	// Add a channel to the listener
-	manager.Notify("channel1", "payload1")
+	upgrader := websocket.Upgrader{}
 
-	for {
-		// Wait for the next payload on the channel
-		err := manager.Listen("channel1")
+	http.HandleFunc("/realtime", func(w http.ResponseWriter, r *http.Request) {
+		c, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
-			panic(err)
+			log.Println(err)
+			return
 		}
-		payload, err := manager.ListenForNextPayload("channel1")
-		if err != nil {
-			panic(err)
+		defer c.Close()
+
+		for {
+			mt, message, err := c.ReadMessage()
+			if err != nil {
+				log.Println("read:", err)
+				break
+			}
+			log.Printf("recv: %s", message)
+			err = c.WriteMessage(mt, message)
+			if err != nil {
+				log.Println("write:", err)
+				break
+			}
 		}
-		// Print the payload
-		println(payload)
-	}
+	})
+
+	log.Fatal(http.ListenAndServe(":8080", nil))
 
 }

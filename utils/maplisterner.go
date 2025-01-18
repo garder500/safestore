@@ -15,6 +15,7 @@ func (ml *mapListener) Notify(channel, payload string) error {
 		return fmt.Errorf("channel %s does not exist", channel)
 	}
 
+	fmt.Println("Sending payload to channel", channel)
 	// Send payload to channel
 	ml.listeners[channel] <- payload
 	return nil
@@ -28,6 +29,7 @@ func (ml *mapListener) listenForNextPayload(channel string) (string, error) {
 
 	// Wait for payload
 	payload := <-ml.listeners[channel]
+	fmt.Println("Received payload from channel", payload)
 	return payload, nil
 }
 

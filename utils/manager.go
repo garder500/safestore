@@ -57,7 +57,6 @@ func setupDB() (*gorm.DB, *pgxpool.Pool, error) {
 }
 
 func (s *Manager) Notify(channel, payload string) error {
-	s.Listener.addChannel(channel)
 	return notify(s.pgx, channel, payload)
 }
 
@@ -77,6 +76,7 @@ func (s *Manager) Listen(channel string) error {
 	}
 	defer conn.Release()
 
+	s.Listener.addChannel(channel)
 	_, err = conn.Exec(context.Background(), "LISTEN "+channel)
 	if err != nil {
 		return fmt.Errorf("failed to start listening: %v", err)
@@ -87,6 +87,7 @@ func (s *Manager) Listen(channel string) error {
 		if err != nil {
 			return fmt.Errorf("error waiting for notification: %v", err)
 		}
+		fmt.Println("Received payload:", notification.Payload)
 		s.Listener.Notify(channel, notification.Payload)
 	}
 }
