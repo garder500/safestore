@@ -11,9 +11,10 @@ import (
 
 type Manager struct {
 	// GORM database connection
-	DB       *gorm.DB
-	pgx      *pgxpool.Pool
-	Listener *mapListener
+	DB               *gorm.DB
+	pgx              *pgxpool.Pool
+	Listener         *mapListener
+	WebsocketManager *WebsocketManager
 }
 
 func NewManager() (*Manager, error) {
@@ -24,12 +25,12 @@ func NewManager() (*Manager, error) {
 	}
 
 	// Create new MapListener
-	listener := newMapListener()
 
 	return &Manager{
-		DB:       gormDB,
-		pgx:      pool,
-		Listener: listener,
+		DB:               gormDB,
+		pgx:              pool,
+		Listener:         newMapListener(),
+		WebsocketManager: NewWebsocketManager(),
 	}, nil
 }
 
