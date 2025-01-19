@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/garder500/safestore/database"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -25,7 +26,14 @@ func NewManager() (*Manager, error) {
 	}
 
 	// Create new MapListener
+	if err := gormDB.Exec("CREATE EXTENSION IF NOT EXISTS ltree").Error; err != nil {
+		return nil, err
+	}
 
+	// Auto migrate your models
+	if err := gormDB.AutoMigrate(&database.SafeRow{}); err != nil {
+		return nil, err
+	}
 	return &Manager{
 		DB:               gormDB,
 		pgx:              pool,
