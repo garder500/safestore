@@ -3,13 +3,13 @@ package database
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lib/pq"
-	"gorm.io/gorm"
 )
 
 type SafeRow struct {
@@ -41,73 +41,57 @@ func (l LTree) Value() (driver.Value, error) {
 	return string(l), nil
 }
 
-func (s *SafeRow) GetChildren(gormDB *gorm.DB) ([]SafeRow, error) {
-	var children []SafeRow
-	if err := gormDB.Where("path <@ ? AND path != ?", s.Path, s.Path).Find(&children).Error; err != nil {
-		return nil, err
-	}
-	return children, nil
-}
-
-func (s *SafeRow) FormatChildren(gormDB *gorm.DB) (map[string]interface{}, error) {
-	children, err := s.GetChildren(gormDB)
-	if err != nil {
-		return nil, err
-	}
-	return formatChildrenRecursive(children, s)
-}
-
-/*
-*
-
-		 The final objective is to get an interface like that :
-		 {
-	    	"posts": {
-	        	"chack": {
-	            	"jack": 3
-	        	},
-	    	}
-		}
-*/
-func formatChildrenRecursive(children []SafeRow, parent *SafeRow) (map[string]interface{}, error) {
-	parentKey := parent.GetKeyFromPath()
-	result := make(map[string]interface{})
-
-	parentValue, err := parent.GetTheNonNullValue()
-	if err != nil {
-		return nil, err
-	}
-
-	childrenData := make(map[string]interface{})
+func FormatChildrenRecursive(children []*SafeRow, startPath string) (map[string]interface{}, error) {
+	results := make(map[string]interface{})
 
 	for _, child := range children {
-		if strings.HasPrefix(string(child.Path), string(parent.Path)+".") && strings.Count(string(child.Path), ".") == strings.Count(string(parent.Path), ".")+1 {
-			childKey := child.GetKeyFromPath()
-			childData, err := formatChildrenRecursive(children, &child)
-			if err != nil {
-				return nil, err
+		childPath := string(child.Path)
+
+		// Convert startPath from URL format to dot notation
+		startPathDot := strings.ReplaceAll(startPath, "/", ".")
+		if startPathDot != "" && !strings.HasPrefix(childPath, startPathDot) {
+			continue
+		}
+
+		// Remove the startPath prefix
+		relativePath := strings.TrimPrefix(childPath, startPathDot)
+		if strings.HasPrefix(relativePath, ".") {
+			relativePath = relativePath[1:]
+		}
+
+		pathParts := strings.Split(relativePath, ".")
+
+		value, err := child.GetTheNonNullValue()
+		if err != nil {
+			return nil, fmt.Errorf("error getting value for path %s: %w", child.Path, err)
+		}
+
+		// Navigate or create nested maps
+		current := results
+		for i, part := range pathParts {
+			if part == "" {
+				continue
 			}
-			if len(childData) > 0 {
-				childrenData[childKey] = childData[childKey]
+			if i == len(pathParts)-1 {
+				// Last part, set the value
+				current[part] = value
 			} else {
-				childValue, err := child.GetTheNonNullValue()
-				if err != nil {
-					return nil, err
+				// Create nested map if it doesn't exist
+				if _, exists := current[part]; !exists {
+					current[part] = make(map[string]interface{})
 				}
-				if childValue != nil {
-					childrenData[childKey] = childValue
+				nextMap, ok := current[part].(map[string]interface{})
+				if !ok {
+					// If it's not a map, create a new one
+					nextMap = make(map[string]interface{})
+					current[part] = nextMap
 				}
+				current = nextMap
 			}
 		}
 	}
 
-	if len(childrenData) > 0 {
-		result[parentKey] = childrenData
-	} else if parentValue != nil {
-		result[parentKey] = parentValue
-	}
-
-	return result, nil
+	return results, nil
 }
 
 func (s *SafeRow) ToJson() (string, error) {

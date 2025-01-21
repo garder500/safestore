@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 type Manager struct {
@@ -44,9 +45,10 @@ func NewManager() (*Manager, error) {
 
 func setupDB() (*gorm.DB, *pgxpool.Pool, error) {
 	dsn := "host=localhost user=safeuser password=safepassword dbname=safestore port=5432 sslmode=disable TimeZone=Europe/Paris"
-
 	// Set up GORM connection
-	gormDB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	gormDB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Info),
+	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to connect to database: %v", err)
 	}
