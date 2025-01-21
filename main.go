@@ -58,38 +58,44 @@ func main() {
 
 	r.PathPrefix("/database/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+
 		path := r.URL.Path[10:]
-		jsonData := []byte{}
-		rows := make([]*database.SafeRow, 0)
-		var err error
+		if r.Method == http.MethodGet {
+			rows := make([]*database.SafeRow, 0)
+			var err error
 
-		if path == "" {
-			err = manager.DB.Find(&rows).Error
+			if path == "" {
+				err = manager.DB.Find(&rows).Error
+			} else {
+				err = database.StartWith(strings.ReplaceAll(path, "/", "."), manager.DB).Find(&rows).Error
+			}
+			if err != nil {
+				jsonData, _ := json.Marshal(map[string]interface{}{"error": err.Error()})
+				http.Error(w, string(jsonData), http.StatusInternalServerError)
+				return
+			}
+
+			data, err := database.FormatChildrenRecursive(rows, path)
+			if err != nil {
+				jsonData, _ := json.Marshal(map[string]interface{}{"error": err.Error()})
+				http.Error(w, string(jsonData), http.StatusInternalServerError)
+				return
+			}
+
+			jsonData, err := json.Marshal(data)
+			if err != nil {
+				jsonData, _ := json.Marshal(map[string]interface{}{"error": err.Error()})
+				http.Error(w, string(jsonData), http.StatusInternalServerError)
+				return
+			}
+
+			w.Write(jsonData)
+		} else if r.Method == http.MethodPost {
+			// tell that this method is not yet handled
+			http.Error(w, "Method not yet implemented", http.StatusNotImplemented)
 		} else {
-			err = database.StartWith(strings.ReplaceAll(path, "/", "."), manager.DB).Find(&rows).Error
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
-
-		if err != nil {
-			jsonData, _ := json.Marshal(map[string]interface{}{"error": err.Error()})
-			http.Error(w, string(jsonData), http.StatusInternalServerError)
-			return
-		}
-
-		data, err := database.FormatChildrenRecursive(rows, path)
-		if err != nil {
-			jsonData, _ := json.Marshal(map[string]interface{}{"error": err.Error()})
-			http.Error(w, string(jsonData), http.StatusInternalServerError)
-			return
-		}
-
-		jsonData, err = json.Marshal(data)
-		if err != nil {
-			jsonData, _ := json.Marshal(map[string]interface{}{"error": err.Error()})
-			http.Error(w, string(jsonData), http.StatusInternalServerError)
-			return
-		}
-
-		w.Write(jsonData)
 	})
 
 	http.Handle("/", r)
