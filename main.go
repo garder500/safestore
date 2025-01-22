@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/garder500/safestore/controllers"
 	"github.com/garder500/safestore/database"
 	"github.com/garder500/safestore/utils"
 	"github.com/gorilla/mux"
@@ -91,8 +92,9 @@ func main() {
 
 			w.Write(jsonData)
 		} else if r.Method == http.MethodPost {
-			// tell that this method is not yet handled
-			http.Error(w, "Method not yet implemented", http.StatusNotImplemented)
+			controllers.PostSafeRow(w, r, manager.DB, &path)
+		} else if r.Method == http.MethodDelete {
+			controllers.DeleteSafeRow(w, r, manager.DB, &path)
 		} else {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}

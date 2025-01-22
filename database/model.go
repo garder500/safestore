@@ -10,6 +10,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lib/pq"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type SafeRow struct {
@@ -55,9 +57,7 @@ func FormatChildrenRecursive(children []*SafeRow, startPath string) (map[string]
 
 		// Remove the startPath prefix
 		relativePath := strings.TrimPrefix(childPath, startPathDot)
-		if strings.HasPrefix(relativePath, ".") {
-			relativePath = relativePath[1:]
-		}
+		relativePath = strings.TrimPrefix(relativePath, ".")
 
 		pathParts := strings.Split(relativePath, ".")
 
@@ -137,4 +137,71 @@ func (s *SafeRow) GetTheNonNullValue() (interface{}, error) {
 		return s.GeoPoint, nil
 	}
 	return nil, nil
+}
+
+func InsertInSafeRow(db *gorm.DB, values *[]map[string]interface{}) error {
+	rows := make([]SafeRow, 0)
+
+	for _, value := range *values {
+		// we need to get the type of the value
+		var safeRow SafeRow = SafeRow{
+			Path: LTree(value["path"].(string)),
+		}
+		for key, val := range value {
+			if key == "path" {
+				continue
+			}
+			switch val := val.(type) {
+			case int:
+				intValue := int32(val)
+				safeRow.Int = &intValue
+			case float64:
+				intValue := int32(val)
+				safeRow.Int = &intValue
+			case string:
+				textValue := val
+				safeRow.Text = &textValue
+			case []string:
+				collectionString := pq.StringArray(val)
+				safeRow.CollectionString = collectionString
+			case []int:
+				collectionInt := pq.Int32Array{}
+				for _, v := range val {
+					collectionInt = append(collectionInt, int32(v))
+				}
+				safeRow.CollectionInt = collectionInt
+			case time.Time:
+				timestampValue := val
+				safeRow.Timestamp = &timestampValue
+			case bool:
+				booleanValue := val
+				safeRow.Boolean = &booleanValue
+			case *pgtype.Numeric:
+				safeRow.Numeric = val
+			case uuid.UUID:
+				uuidValue := val
+				safeRow.UUID = &uuidValue
+			case []byte:
+				binaryData := val
+				safeRow.BinaryData = binaryData
+			case *pgtype.Point:
+				safeRow.GeoPoint = val
+			}
+		}
+		rows = append(rows, safeRow)
+	}
+
+	// we need to remove bottom rows if they are already in the database
+	// we remove any path that start with each path
+	for _, row := range rows {
+		err := StartWith(string(row.Path), db).Delete(&SafeRow{}).Error
+		if err != nil {
+			return err
+		}
+	}
+	return db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "path"}},
+		DoUpdates: clause.AssignmentColumns([]string{"int_value", "text_value", "collection_string", "collection_int", "timestamp_value", "boolean_value", "numeric_value", "uuid_value", "binary_data", "geo_point"}),
+	}).Create(&rows).Error
+
 }
