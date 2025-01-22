@@ -161,15 +161,6 @@ func InsertInSafeRow(db *gorm.DB, values *[]map[string]interface{}) error {
 			case string:
 				textValue := val
 				safeRow.Text = &textValue
-			case []string:
-				collectionString := pq.StringArray(val)
-				safeRow.CollectionString = collectionString
-			case []int:
-				collectionInt := pq.Int32Array{}
-				for _, v := range val {
-					collectionInt = append(collectionInt, int32(v))
-				}
-				safeRow.CollectionInt = collectionInt
 			case time.Time:
 				timestampValue := val
 				safeRow.Timestamp = &timestampValue
@@ -186,6 +177,35 @@ func InsertInSafeRow(db *gorm.DB, values *[]map[string]interface{}) error {
 				safeRow.BinaryData = binaryData
 			case *pgtype.Point:
 				safeRow.GeoPoint = val
+			}
+
+			// it's possible that the value is an array of values and we need to check the type of the first element
+			// to know the type of the array
+			switch val := val.(type) {
+			case []interface{}:
+				if len(val) == 0 {
+					continue
+				}
+				switch val[0].(type) {
+				case string:
+					collectionString := make([]string, 0)
+					for _, v := range val {
+						collectionString = append(collectionString, v.(string))
+					}
+					safeRow.CollectionString = collectionString
+				case int:
+					collectionInt := make([]int32, 0)
+					for _, v := range val {
+						collectionInt = append(collectionInt, int32(v.(int)))
+					}
+					safeRow.CollectionInt = collectionInt
+				case float64:
+					collectionInt := make([]int32, 0)
+					for _, v := range val {
+						collectionInt = append(collectionInt, int32(v.(float64)))
+					}
+					safeRow.CollectionInt = collectionInt
+				}
 			}
 		}
 		rows = append(rows, safeRow)
