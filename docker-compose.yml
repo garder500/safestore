@@ -1,13 +1,12 @@
 
 services:
   database:
-    image: postgres:alpine
+    container_name: Safestore
+    build: .
     environment:
-      POSTGRES_DB: safestore
-      POSTGRES_USER: safeuser
-      POSTGRES_PASSWORD: safepassword
+      PORT: 4789
     ports:
-      - "5432:5432"
+      - "4789:4789"
     volumes:
       - db-data:/var/lib/postgresql/data
 

@@ -4,7 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/garder500/safestore/database"
+	"safestore/database"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

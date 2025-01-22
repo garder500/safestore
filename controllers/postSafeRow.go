@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/garder500/safestore/database"
-	"github.com/garder500/safestore/utils"
+	"safestore/database"
+	"safestore/utils"
+
 	"gorm.io/gorm"
 )
 

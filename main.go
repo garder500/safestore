@@ -2,13 +2,16 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 
-	"github.com/garder500/safestore/controllers"
-	"github.com/garder500/safestore/database"
-	"github.com/garder500/safestore/utils"
+	"safestore/controllers"
+	"safestore/database"
+	"safestore/utils"
+
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 )
@@ -99,8 +102,11 @@ func main() {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
-
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "3478"
+	}
 	http.Handle("/", r)
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), nil))
 
 }
