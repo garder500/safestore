@@ -28,6 +28,10 @@ type SafeRow struct {
 	GeoPoint         *pgtype.Point   `gorm:"type:point;column:geo_point" json:"geo_point"`
 }
 
+func (*SafeRow) TableName() string {
+	return "realtime.safe_rows"
+}
+
 type LTree string
 
 func (l *LTree) Scan(value interface{}) error {

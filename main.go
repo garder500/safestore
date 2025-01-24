@@ -38,21 +38,45 @@ func main() {
 		}
 
 		manager.WebsocketManager.AddClient(userID, c)
+		jsonOp := utils.WebSocketQuery{}
 		for {
-			mt, message, err := c.ReadMessage()
+			// read json message
+			err := c.ReadJSON(&jsonOp)
 			if err != nil {
 				log.Println("read:", err)
 				manager.WebsocketManager.RemoveClient(userID)
 				break
 			}
-			log.Printf("recv: %s by %s", message, userID)
-			// search if the first word is broadcast
-			if string(message[:9]) == "broadcast" {
-				manager.WebsocketManager.Broadcast(message[10:], userID)
-				// we need to continue to avoid sending the message to the client
-				continue
+
+			switch jsonOp.Op {
+			case 0: // Authentication operation
+				authPayload := jsonOp.Data.(utils.AuthPayload)
+
+				if authPayload.Token != "" && authPayload.Token == "supersecret" {
+					c.WriteJSON(utils.WebSocketQuery{Op: 0, Data: "Authorized"})
+				} else {
+					c.WriteJSON(utils.WebSocketQuery{Op: 0, Data: "Unauthorized"})
+					manager.WebsocketManager.RemoveClient(userID)
+					c.Close()
+					break
+				}
+			case 1: // Insert operation in the database
+				crudPayload := jsonOp.Data.(utils.CrudPayload)
+				var paths []map[string]interface{}
+				utils.GeneratePaths(crudPayload.Data, crudPayload.Path, &paths)
+				err = database.InsertInSafeRow(manager.DB, &paths)
+				if err != nil {
+					log.Println(err)
+					break
+				}
+				jsonData, err := json.Marshal(utils.WebSocketQuery{Op: 1, Data: crudPayload})
+				if err != nil {
+					log.Println(err)
+					break
+				}
+				manager.WebsocketManager.Broadcast(jsonData, userID)
 			}
-			err = c.WriteMessage(mt, message)
+			err = c.WriteJSON(jsonOp)
 			if err != nil {
 				log.Println("write:", err)
 				break
@@ -104,7 +128,7 @@ func main() {
 	})
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "3478"
+		port = "4789"
 	}
 	http.Handle("/", r)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), nil))

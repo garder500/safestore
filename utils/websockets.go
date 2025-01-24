@@ -14,6 +14,20 @@ type WebsocketManager struct {
 	clients map[string]*websocket.Conn
 }
 
+type WebSocketQuery struct {
+	Op   float64     `json:"op"`
+	Data interface{} `json:"data"`
+}
+
+type AuthPayload struct {
+	Token string `json:"token"`
+}
+
+type CrudPayload struct {
+	Path string                 `json:"path"`
+	Data map[string]interface{} `json:"data"`
+}
+
 func NewWebsocketManager() *WebsocketManager {
 	return &WebsocketManager{
 		clients: make(map[string]*websocket.Conn),
