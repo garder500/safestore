@@ -49,7 +49,7 @@ func main() {
 			}
 
 			switch jsonOp.Op {
-			case 0: // Authentication operation
+			case utils.AuthOp: // Authentication operation
 				authPayload := jsonOp.Data.(utils.AuthPayload)
 
 				if authPayload.Token != "" && authPayload.Token == "supersecret" {
@@ -60,7 +60,7 @@ func main() {
 					c.Close()
 					break
 				}
-			case 1: // Insert operation in the database
+			case utils.InsertOp: // Insert operation in the database
 				crudPayload := jsonOp.Data.(utils.CrudPayload)
 				var paths []map[string]interface{}
 				utils.GeneratePaths(crudPayload.Data, crudPayload.Path, &paths)

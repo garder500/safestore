@@ -14,8 +14,17 @@ type WebsocketManager struct {
 	clients map[string]*websocket.Conn
 }
 
+type OpEnum int // OpEnum is an enum for the websocket operations
+const (
+	AuthOp OpEnum = iota
+	InsertOp
+	DeleteOp
+	UpdateOp
+	GetOp
+)
+
 type WebSocketQuery struct {
-	Op   float64     `json:"op"`
+	Op   OpEnum      `json:"op"`
 	Data interface{} `json:"data"`
 }
 
