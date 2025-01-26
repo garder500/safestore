@@ -1,10 +1,7 @@
 package utils
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
-	"fmt"
 	"log"
 
 	"github.com/gorilla/websocket"
@@ -29,7 +26,8 @@ type WebSocketQuery struct {
 }
 
 type AuthPayload struct {
-	Token string `json:"token"`
+	Token         string `json:"token"`
+	Authorization string `json:"authorization"`
 }
 
 type CrudPayload struct {
@@ -51,49 +49,39 @@ func (wm *WebsocketManager) RemoveClient(userID string) {
 	delete(wm.clients, userID)
 }
 
-func (wm *WebsocketManager) Broadcast(message []byte, exclude ...string) {
+func (wm *WebsocketManager) Broadcast(message interface{}, exclude ...string) {
 	for userID, conn := range wm.clients {
 		for _, ex := range exclude {
 			if userID == ex {
 				continue
 			} else {
-				err := conn.WriteMessage(websocket.TextMessage, message)
+				err := conn.WriteJSON(message)
 				if err != nil {
-					log.Println("error writing message:", err)
+					log.Printf("error writing message to %s: %s", userID, err)
 				}
 			}
 		}
 	}
 }
 
-func GenerateRandomString() (string, error) {
-	b := make([]byte, 32)
-	_, err := rand.Read(b)
-	if err != nil {
-		fmt.Println("error:", err)
-		return "", err
-	}
-	return hex.EncodeToString(b), nil
-}
-
-func (wm *WebsocketManager) SendToUser(userID string, message []byte) error {
+func (wm *WebsocketManager) SendToUser(userID string, message interface{}) error {
 	conn, ok := wm.clients[userID]
 	if !ok {
 		return errors.New("user not found")
 	}
-	return conn.WriteMessage(websocket.TextMessage, message)
+	return conn.WriteJSON(message)
 }
 
-func (wm *WebsocketManager) SendToMultipleUsers(userIDs []string, message []byte) {
+func (wm *WebsocketManager) SendToMultipleUsers(userIDs []string, message interface{}) {
 	// send to existing clients only
 	for _, userID := range userIDs {
 		conn, ok := wm.clients[userID]
 		if !ok {
 			continue
 		}
-		err := conn.WriteMessage(websocket.TextMessage, message)
+		err := conn.WriteJSON(message)
 		if err != nil {
-			log.Println("error writing message:", err)
+			log.Printf("error writing message to %s: %s", userID, err)
 		}
 	}
 }

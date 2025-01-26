@@ -1,14 +1,12 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"strings"
 
-	"safestore/controllers"
 	"safestore/database"
 	"safestore/utils"
 
@@ -39,6 +37,7 @@ func main() {
 
 		manager.WebsocketManager.AddClient(userID, c)
 		jsonOp := utils.WebSocketQuery{}
+	outer:
 		for {
 			// read json message
 			err := c.ReadJSON(&jsonOp)
@@ -58,7 +57,7 @@ func main() {
 					c.WriteJSON(utils.WebSocketQuery{Op: 0, Data: "Unauthorized"})
 					manager.WebsocketManager.RemoveClient(userID)
 					c.Close()
-					break
+					break outer
 				}
 			case utils.InsertOp: // Insert operation in the database
 				crudPayload := jsonOp.Data.(utils.CrudPayload)
@@ -67,14 +66,52 @@ func main() {
 				err = database.InsertInSafeRow(manager.DB, &paths)
 				if err != nil {
 					log.Println(err)
-					break
+					c.WriteJSON(utils.WebSocketQuery{Op: 0, Data: err.Error()})
 				}
-				jsonData, err := json.Marshal(utils.WebSocketQuery{Op: 1, Data: crudPayload})
+				manager.WebsocketManager.Broadcast(jsonOp)
+			case utils.DeleteOp: // Delete operation in the database
+				crudPayload := jsonOp.Data.(utils.CrudPayload)
+				err := database.DeleteInSafeRow(manager.DB, &crudPayload.Path)
 				if err != nil {
-					log.Println(err)
-					break
+					c.WriteJSON(utils.WebSocketQuery{Op: 0, Data: err.Error()})
+				} else {
+					manager.WebsocketManager.Broadcast(jsonOp)
 				}
-				manager.WebsocketManager.Broadcast(jsonData, userID)
+			case utils.GetOp:
+				crudPayload := jsonOp.Data.(utils.CrudPayload)
+				rows := make([]*database.SafeRow, 0)
+				path := crudPayload.Path
+				var err error
+
+				if path == "" {
+					err = manager.DB.Find(&rows).Error
+				} else {
+					err = database.StartWith(strings.ReplaceAll(path, "/", "."), manager.DB).Find(&rows).Error
+				}
+				if err != nil {
+					c.WriteJSON(utils.WebSocketQuery{
+						Op: 500,
+						Data: map[string]interface{}{
+							"error": err.Error(),
+						},
+					})
+				}
+
+				data, err := database.FormatChildrenRecursive(rows, path)
+				if err != nil {
+					c.WriteJSON(utils.WebSocketQuery{
+						Op: 500,
+						Data: map[string]interface{}{
+							"error": err.Error(),
+						},
+					})
+				}
+
+				manager.WebsocketManager.Broadcast(utils.WebSocketQuery{
+					Op:   200,
+					Data: data,
+				})
+
 			}
 			err = c.WriteJSON(jsonOp)
 			if err != nil {
@@ -87,44 +124,8 @@ func main() {
 	r.PathPrefix("/database/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
-		path := r.URL.Path[10:]
-		if r.Method == http.MethodGet {
-			rows := make([]*database.SafeRow, 0)
-			var err error
-
-			if path == "" {
-				err = manager.DB.Find(&rows).Error
-			} else {
-				err = database.StartWith(strings.ReplaceAll(path, "/", "."), manager.DB).Find(&rows).Error
-			}
-			if err != nil {
-				jsonData, _ := json.Marshal(map[string]interface{}{"error": err.Error()})
-				http.Error(w, string(jsonData), http.StatusInternalServerError)
-				return
-			}
-
-			data, err := database.FormatChildrenRecursive(rows, path)
-			if err != nil {
-				jsonData, _ := json.Marshal(map[string]interface{}{"error": err.Error()})
-				http.Error(w, string(jsonData), http.StatusInternalServerError)
-				return
-			}
-
-			jsonData, err := json.Marshal(data)
-			if err != nil {
-				jsonData, _ := json.Marshal(map[string]interface{}{"error": err.Error()})
-				http.Error(w, string(jsonData), http.StatusInternalServerError)
-				return
-			}
-
-			w.Write(jsonData)
-		} else if r.Method == http.MethodPost {
-			controllers.PostSafeRow(w, r, manager.DB, &path)
-		} else if r.Method == http.MethodDelete {
-			controllers.DeleteSafeRow(w, r, manager.DB, &path)
-		} else {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		}
+		// path := r.URL.Path[10:]
+		utils.FormatHttpError(w, http.StatusNotImplemented, "Not implemented", "This endpoint is not implemented yet")
 	})
 	port := os.Getenv("PORT")
 	if port == "" {

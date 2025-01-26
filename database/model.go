@@ -229,3 +229,23 @@ func InsertInSafeRow(db *gorm.DB, values *[]map[string]interface{}) error {
 	}).Create(&rows).Error
 
 }
+
+func DeleteInSafeRow(db *gorm.DB, path *string) error {
+	rows := make([]*SafeRow, 0)
+	if *path == "" {
+		// we need to delete all the rows
+		err := db.Find(&rows).Error
+		if err != nil {
+			return err
+		}
+		for _, row := range rows {
+			err := db.Delete(row).Error
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return StartWith(*path, db).Delete(&rows).Error
+
+}
