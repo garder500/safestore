@@ -32,8 +32,15 @@ func NewManager() (*Manager, error) {
 		return nil, err
 	}
 
+	if err := gormDB.Exec("CREATE SCHEMA IF NOT EXISTS realtime").Error; err != nil {
+		return nil, err
+	}
+
+	if err := gormDB.Exec("CREATE SCHEMA IF NOT EXISTS store").Error; err != nil {
+		return nil, err
+	}
 	// Auto migrate your models
-	if err := gormDB.AutoMigrate(&database.SafeRow{}); err != nil {
+	if err := gormDB.AutoMigrate(&database.SafeRow{}, &database.StoreRow{}); err != nil {
 		return nil, err
 	}
 	return &Manager{

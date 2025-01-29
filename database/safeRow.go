@@ -7,25 +7,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/lib/pq"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
 type SafeRow struct {
-	Path             LTree           `gorm:"type:ltree;primaryKey;index:idx_path_gist,type:gist" json:"path"`
-	Int              *int32          `gorm:"column:int_value" json:"int_value"`
-	Text             *string         `gorm:"column:text_value" json:"text_value"`
-	CollectionString pq.StringArray  `gorm:"type:text[];column:collection_string" json:"collection_string"`
-	CollectionInt    pq.Int32Array   `gorm:"type:integer[];column:collection_int" json:"collection_int"`
-	Timestamp        *time.Time      `gorm:"column:timestamp_value" json:"timestamp_value"`
-	Boolean          *bool           `gorm:"column:boolean_value" json:"boolean_value"`
-	Numeric          *pgtype.Numeric `gorm:"type:numeric(15,2);column:numeric_value" json:"numeric_value"`
-	UUID             *uuid.UUID      `gorm:"type:uuid;column:uuid_value" json:"uuid_value"`
-	BinaryData       []byte          `gorm:"type:bytea;column:binary_data" json:"binary_data"`
-	GeoPoint         *pgtype.Point   `gorm:"type:point;column:geo_point" json:"geo_point"`
+	Path             LTree          `gorm:"type:ltree;primaryKey;index:idx_path_gist,type:gist" json:"path"`
+	Int              *int32         `gorm:"column:int_value" json:"int_value"`
+	Text             *string        `gorm:"column:text_value" json:"text_value"`
+	CollectionString pq.StringArray `gorm:"type:text[];column:collection_string" json:"collection_string"`
+	CollectionInt    pq.Int32Array  `gorm:"type:integer[];column:collection_int" json:"collection_int"`
+	Timestamp        *time.Time     `gorm:"column:timestamp_value" json:"timestamp_value"`
+	Boolean          *bool          `gorm:"column:boolean_value" json:"boolean_value"`
 }
 
 func (*SafeRow) TableName() string {
@@ -131,14 +125,6 @@ func (s *SafeRow) GetTheNonNullValue() (interface{}, error) {
 		return *s.Timestamp, nil
 	} else if s.Boolean != nil {
 		return *s.Boolean, nil
-	} else if s.Numeric != nil {
-		return s.Numeric, nil
-	} else if s.UUID != nil {
-		return *s.UUID, nil
-	} else if len(s.BinaryData) > 0 {
-		return s.BinaryData, nil
-	} else if s.GeoPoint != nil {
-		return s.GeoPoint, nil
 	}
 	return nil, nil
 }
@@ -171,16 +157,6 @@ func InsertInSafeRow(db *gorm.DB, values *[]map[string]interface{}) error {
 			case bool:
 				booleanValue := val
 				safeRow.Boolean = &booleanValue
-			case *pgtype.Numeric:
-				safeRow.Numeric = val
-			case uuid.UUID:
-				uuidValue := val
-				safeRow.UUID = &uuidValue
-			case []byte:
-				binaryData := val
-				safeRow.BinaryData = binaryData
-			case *pgtype.Point:
-				safeRow.GeoPoint = val
 			}
 
 			// it's possible that the value is an array of values and we need to check the type of the first element
