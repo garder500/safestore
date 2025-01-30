@@ -7,12 +7,17 @@ import (
 	"os"
 	"strings"
 
+	"safestore/controllers"
 	"safestore/database"
 	"safestore/utils"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 )
+
+func init() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmicroseconds)
+}
 
 func main() {
 	r := mux.NewRouter()
@@ -123,8 +128,13 @@ func main() {
 
 	r.PathPrefix("/database/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-
-		// path := r.URL.Path[10:]
+		if r.Method == http.MethodGet {
+			controllers.GetController(w, r, manager.DB)
+			return
+		} else if r.Method == http.MethodPost {
+			controllers.PostController(w, r, manager.DB)
+			return
+		}
 		utils.FormatHttpError(w, http.StatusNotImplemented, "Not implemented", "This endpoint is not implemented yet")
 	})
 	port := os.Getenv("PORT")

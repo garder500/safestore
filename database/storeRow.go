@@ -18,10 +18,28 @@ func (*StoreRow) TableName() string {
 	return "store.store_rows"
 }
 
-func GetCollection(db *gorm.DB, collection string) ([]StoreRow, error) {
+func GetCollection(db *gorm.DB, collection string) (map[string]interface{}, error) {
 	var rows []StoreRow
 	err := db.Where("path = ?", collection).Find(&rows).Error
-	return rows, err
+	// return only decoded data
+
+	if err != nil {
+		return nil, err
+	}
+
+	data := make(map[string]interface{}, 0)
+	for _, row := range rows {
+		// data is in base64, decode it
+		var decodedData map[string]interface{}
+		err = json.Unmarshal(row.Data, &decodedData)
+		if err != nil {
+			return nil, err
+		}
+
+		data[row.CollectionId] = decodedData
+	}
+
+	return data, nil
 }
 
 func MergeInterface(a, b map[string]interface{}) map[string]interface{} {
@@ -108,22 +126,49 @@ func GetChildCollections(db *gorm.DB, collection string) ([]string, error) {
 	return collections, nil
 }
 
-func SearchUsingJsonBPath(db *gorm.DB, collection, path, value, searchType string) ([]StoreRow, error) {
+func UpdateOrCreateInterface(db *gorm.DB, collection string, id string, data map[string]interface{}) error {
+	// Update the row if it exists
+
+	jsonData, err := json.Marshal(data)
+
+	if err != nil {
+		return err
+	}
+
+	return db.Model(&StoreRow{}).Where("path = ?", collection).Where("collection_id = ?", id).FirstOrCreate(&StoreRow{
+		Collection:   LTree(collection),
+		CollectionId: id,
+		Data:         jsonData,
+	}).Error
+}
+
+type FilterSearch struct {
+	Path       string `json:"path"`
+	SearchType string `json:"searchType"`
+	Value      string `json:"value"`
+}
+
+func SearchUsingJsonBPath(db *gorm.DB, collection string, filters []FilterSearch) ([]StoreRow, error) {
 	var rows []StoreRow
 	var err error
-	switch searchType {
-	case "contains":
-		err = db.Where("path = ?", collection).Where("jsonb_path_exists(data, $1)", fmt.Sprintf("$[*] ? (@ like_regex \"%s\")", strings.ReplaceAll(value, "*", ".*"))).Find(&rows).Error
-	case "equals":
-		err = db.Where("path = ?", collection).Where("jsonb_path_exists(data, $1)", fmt.Sprintf("$[*] ? (@ == \"%s\")", value)).Find(&rows).Error
-	case "notEquals":
-		err = db.Where("path = ?", collection).Not("jsonb_path_exists(data, $1)", fmt.Sprintf("$[*] ? (@ == \"%s\")", value)).Find(&rows).Error
-	case "startWith":
-		err = db.Where("path = ?", collection).Where("jsonb_path_exists(data, $1)", fmt.Sprintf("$[*] ? (@ like_regex \"%s.*\")", value)).Find(&rows).Error
-	case "endWith":
-		err = db.Where("path = ?", collection).Where("jsonb_path_exists(data, $1)", fmt.Sprintf("$[*] ? (@ like_regex \".*%s\")", value)).Find(&rows).Error
-	case "startAndEndWith":
-		err = db.Where("path = ?", collection).Where("jsonb_path_exists(data, $1)", fmt.Sprintf("$[*] ? (@ like_regex \"%s.*%s\")", path, value)).Find(&rows).Error
+	var finalQuery *gorm.DB = db.Where("path = ?", collection)
+	for _, filter := range filters {
+		switch filter.SearchType {
+		case "contains":
+			finalQuery = db.Where("jsonb_path_exists(data, $1)", fmt.Sprintf("$[*] ? (@ like_regex \"%s\")", strings.ReplaceAll(filter.Value, "*", ".*")))
+		case "equals":
+			finalQuery = db.Where("jsonb_path_exists(data, $1)", fmt.Sprintf("$[*] ? (@ == \"%s\")", filter.Value))
+		case "notEquals":
+			finalQuery = db.Not("jsonb_path_exists(data, $1)", fmt.Sprintf("$[*] ? (@ == \"%s\")", filter.Value))
+		case "startWith":
+			finalQuery = db.Where("jsonb_path_exists(data, $1)", fmt.Sprintf("$[*] ? (@ like_regex \"%s.*\")", filter.Value))
+		case "endWith":
+			finalQuery = db.Where("jsonb_path_exists(data, $1)", fmt.Sprintf("$[*] ? (@ like_regex \".*%s\")", filter.Value))
+		case "startAndEndWith":
+			finalQuery = db.Where("jsonb_path_exists(data, $1)", fmt.Sprintf("$[*] ? (@ like_regex \"%s.*%s\")", filter.Path, filter.Value))
+		}
 	}
+
+	err = finalQuery.Find(&rows).Error
 	return rows, err
 }
