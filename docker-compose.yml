@@ -14,9 +14,9 @@ services:
     image: postgres:alpine
     container_name: postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: Safestore
+      POSTGRES_USER: safeuser
+      POSTGRES_PASSWORD: safepassword
+      POSTGRES_DB: safestore
     ports:
       - "5432:5432"
     volumes:
