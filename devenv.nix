@@ -2,7 +2,7 @@
 
 {
   # https://devenv.sh/basics/
-  env.GREET = "devenv";
+  env.GREET = "User";
 
   # https://devenv.sh/packages/
   packages = [
@@ -30,6 +30,17 @@
     go version
   '';
 
+  services.postgres = {
+    enable = true;
+    port = 5432;
+    package = pkgs.postgresql_15;
+    listen_addresses = "127.0.0.1";
+    initialDatabases = [{
+      name = "safestore";
+      user = "safeuser";
+      pass = "safepassword";
+       }];
+  };
   # https://devenv.sh/tasks/
   # tasks = {
   #   "myproj:setup".exec = "mytool build";
