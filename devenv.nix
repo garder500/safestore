@@ -7,7 +7,6 @@
   # https://devenv.sh/packages/
   packages = [
     pkgs.git
-    pkgs.go_1_23
      ];
 
   # https://devenv.sh/languages/
