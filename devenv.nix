@@ -16,6 +16,8 @@
   # https://devenv.sh/processes/
   # processes.cargo-watch.exec = "cargo-watch";
 
+  processes.golang.exec = "go run main.go";
+
   # https://devenv.sh/services/
   # services.postgres.enable = true;
 
